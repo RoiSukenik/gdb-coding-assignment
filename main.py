@@ -8,8 +8,9 @@ from dotenv import load_dotenv
 from oauthlib.oauth2 import BackendApplicationClient
 from pydantic.main import BaseModel
 from requests_oauthlib import OAuth2Session
+from http import HTTPStatus
 
-import constants as constant
+import constants
 
 load_dotenv()
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
@@ -33,7 +34,7 @@ class FeaturedSong(BaseModel):
 def get_auth_response():
     client = BackendApplicationClient(client_id=SPOTIFY_CLIENT_ID)
     oauth = OAuth2Session(client=client)
-    auth_resp = oauth.fetch_token(token_url='https://accounts.spotify.com/api/token', client_secret=SPOTIFY_SECRET)
+    auth_resp = oauth.fetch_token(token_url=constants.SPOTIFY_TOKEN_URL, client_secret=SPOTIFY_SECRET)
     return auth_resp
 
 
@@ -44,13 +45,14 @@ def map_to_artiest_names_list(artiest_object) -> List[str]:
 def track_to_featured_song(track_obj: dict, playlist_id: str, playlist_name: str, playlist_rank: int,
                            track_rank: int) -> FeaturedSong:
     track = track_obj["track"]
+    # If track isn't by normal format, ignore it as base. On large scale this would have been handled.
     if track is None:
         return None
     artiest_list = list(map(map_to_artiest_names_list, track["artists"]))
     featured_song = FeaturedSong(track_id=track["id"], track_name=track["name"], artist_names=artiest_list,
                                  playlist_id=playlist_id, playlist_name=playlist_name,
-                                 playlist_rank=playlist_rank + constant.RANKING_ADJUSTER,
-                                 track_rank=track_rank + constant.RANKING_ADJUSTER)
+                                 playlist_rank=playlist_rank + constants.RANKING_ADJUSTER,
+                                 track_rank=track_rank + constants.RANKING_ADJUSTER)
     return featured_song
 
 
@@ -59,7 +61,7 @@ def get_playlist_tracks(access_token: str, playlist_item: dict):
     playlist = requests.request(method="GET",
                                 url=url,
                                 headers={"Authorization": f"Bearer {access_token} "})
-    if playlist.status_code != 200:
+    if playlist.status_code != HTTPStatus.OK:
         raise Exception(playlist.error.message)
 
     track = json.loads(playlist.text)
@@ -67,12 +69,13 @@ def get_playlist_tracks(access_token: str, playlist_item: dict):
 
 
 def get_playlists_by_category(access_token: str, category: str, country_code: str):
-    response = requests.request(method="GET", url=f"https://api.spotify.com/v1/browse/categories/{category}/playlists",
+    response = requests.request(method="GET", url=f"{constants.SPOTIFY_CATEGORIES_BASE_URL}{category}/playlists",
                                 headers={"Authorization": f"Bearer {access_token} "},
-                                params={"country": country_code, "limit": constant.PLAYLIST_LIMIT})
+                                params={"country": country_code, "limit": constants.PLAYLIST_LIMIT})
 
-    if response.status_code != 200:
+    if response.status_code != HTTPStatus.OK:
         raise Exception(response.error.message)
+
     return json.loads(response.text)
 
 
@@ -82,7 +85,9 @@ def track_data(category: str, country_code: str) -> List[FeaturedSong]:
     playlists = get_playlists_by_category(access_token, category, country_code)["playlists"]["items"]
     featured_songs = list()
     for playlist_index in range(len(playlists)):
+
         playlist_tracks = get_playlist_tracks(access_token, playlists[playlist_index])
+
         for track_index in range(len(playlist_tracks)):
             featured_song = track_to_featured_song(playlist_tracks[track_index], playlists[playlist_index]["id"],
                                                    playlists[playlist_index]["name"], playlist_index, track_index)
