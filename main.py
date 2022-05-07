@@ -69,7 +69,9 @@ def get_playlist_tracks(access_token: str, playlist_item: dict):
 
 
 def get_playlists_by_category(access_token: str, category: str, country_code: str):
-    response = requests.request(method="GET", url=f"{constants.SPOTIFY_CATEGORIES_BASE_URL}{category}/playlists",
+    request_url = f"{constants.SPOTIFY_CATEGORIES_BASE_URL}{category}/playlists"
+    response = requests.request(method="GET",
+                                url=request_url,
                                 headers={"Authorization": f"Bearer {access_token} "},
                                 params={"country": country_code, "limit": constants.PLAYLIST_LIMIT})
 
