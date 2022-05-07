@@ -31,6 +31,8 @@ class FeaturedSong(BaseModel):
     track_rank: int  # position of the track in the playlist
 
 
+# Seeing as it is internal use api I might have used Redis or other caching to store that value and speed things up,
+# and only use this function once the value for the token expires
 def get_auth_response():
     client = BackendApplicationClient(client_id=SPOTIFY_CLIENT_ID)
     oauth = OAuth2Session(client=client)
